@@ -5,17 +5,57 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Audiolist</title>
   <link rel="stylesheet" href="styles.css" />
-  
-  <!-- Scripts voor browser-ondersteuning van React en Babel -->
   <script src="https://unpkg.com" crossorigin></script>
   <script src="https://unpkg.com" crossorigin></script>
   <script src="https://unpkg.com"></script>
 </head>
 <body>
   <div id="root"></div>
+  <script type="text/babel">
+    const { useEffect, useRef, useState } = React;
+    const STORE_KEY = "audiolist.v1";
 
-  <!-- We laden hier eerst de helpers in, en daarna de app-logica -->
-  <script type="text/babel" src="helpers.js"></script>
-  <script type="text/babel" src="app.js"></script>
-</body>
-</html>
+    function loadStore() {
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return [];
+    }
+
+    function saveStore(lists) {
+      try {
+        localStorage.setItem(STORE_KEY, JSON.stringify(lists));
+      } catch (e) {
+        alert("Opslagruimte vol (limiet van 5MB). Verwijder oude opnames.");
+      }
+    }
+
+    function fmt(sec) {
+      sec = Math.max(0, Math.round(sec));
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}:${String(s).padStart(2, "0")}`;
+    }
+
+    const peakCache = new Map();
+    function peaks(id, n) {
+      if (peakCache.has(id)) return peakCache.get(id);
+      let seed = 0;
+      for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) % 1e5;
+      const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483647) / 2147483647;
+      const arr = [];
+      for (let i = 0; i < n; i++) arr.push(0.2 + rnd() * 0.8);
+      peakCache.set(id, arr);
+      return arr;
+    }
+
+    function getSupportedMimeType() {
+      const types = ["audio/mp4; codecs=mp4a", "audio/aac", "audio/webm; codecs=opus", "audio/webm"];
+      for (const type of types) {
+        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(type)) return type;
+      }
+      return "";
+    }
+
+    // Het overige deel van de interface-code staat hieronder in het volgende blok!
