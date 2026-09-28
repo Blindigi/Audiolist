@@ -59,3 +59,161 @@
     }
 
     // Het overige deel van de interface-code staat hieronder in het volgende blok!
+        function App() {
+      const [lists, setLists] = useState(loadStore);
+      const [openId, setOpenId] = useState(null);
+      const [newName, setNewName] = useState("");
+      const [recording, setRecording] = useState(false);
+      const [recTicks, setRecTicks] = useState(0);
+      const [playingId, setPlayingId] = useState(null);
+      const recorderRef = useRef(null);
+      const chunksRef = useRef([]);
+      const intervalRef = useRef(null);
+      const playerRef = useRef(null);
+
+      useEffect(() => saveStore(lists), [lists]);
+      useEffect(() => { if (openId) { stopRecorder(); stopAudio(); setPlayingId(null); } }, [openId]);
+
+      const openList = lists.find((l) => l.id === openId) || null;
+      function persist(mutate) { const next = loadStore(); mutate(next); setLists(next); }
+
+      async function startRecorder() {
+        let stream;
+        try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e) { alert("Microphone unavailable."); return; }
+        const mimeType = getSupportedMimeType();
+        const options = { audioBitsPerSecond: 64000 };
+        if (mimeType) options.mimeType = mimeType;
+        let rec;
+        try { rec = new MediaRecorder(stream, options); } catch (err) { rec = new MediaRecorder(stream); }
+        chunksRef.current = [];
+        rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data); };
+        rec.start();
+        recorderRef.current = { rec, stream, mimeType: rec.mimeType || mimeType };
+        setRecTicks(0); setRecording(true);
+        intervalRef.current = setInterval(() => setRecTicks((t) => t + 1), 1e3);
+      }
+
+      function stopRecorder() {
+        setRecording(false);
+        if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+        const hand = recorderRef.current; recorderRef.current = null;
+        if (!hand || !openList) return;
+        const currentMime = hand.mimeType;
+        hand.rec.onstop = () => {
+          try { hand.stream.getTracks().forEach((t) => t.stop()); } catch (e) {}
+          const blob = new Blob(chunksRef.current, { type: currentMime || "audio/webm" });
+          if (!blob.size) return;
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const id = crypto.randomUUID();
+            const idx = openList.items.length + 1;
+            let ext = "webm";
+            if (currentMime && (currentMime.includes("mp4") || currentMime.includes("aac"))) ext = "m4a";
+            const item = { id, name: `Recording ${String(idx).padStart(2, "0")}`, url: reader.result, duration: Math.max(1, recTicks), ext };
+            persist((next) => { const l = next.find((x) => x.id === openList.id); if (l) l.items.push(item); });
+            setPlayingId(null);
+          };
+          reader.readAsDataURL(blob);
+        };
+        hand.rec.stop(); setPlayingId(null);
+      }
+
+      function stopAudio() { if (playerRef.current) { try { playerRef.current.pause(); playerRef.current.src = ""; } catch (e) {} playerRef.current = null; } setPlayingId(null); }
+
+      async function togglePlay(itemId) {
+        const it = openList.items.find((x) => x.id === itemId); if (!it) return;
+        if (playingId === itemId) { stopAudio(); return; }
+        stopAudio();
+        const el = new Audio(); el.src = it.url; el.addEventListener("ended", () => setPlayingId(null));
+        playerRef.current = el; setPlayingId(itemId);
+        try { el.play(); } catch (e) {}
+      }
+
+      function downloadAudio(itemId) {
+        const it = openList.items.find((x) => x.id === itemId); if (!it) return;
+        const a = document.createElement("a"); a.href = it.url; a.download = `${it.name || "recording"}.${it.ext || "webm"}`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }
+
+      const renameItem = (itemId, name) => persist((next) => { const l = next.find((x) => x.id === openList.id); const i = l.items.find((x) => x.id === itemId); i.name = name; });
+      const deleteItem = (itemId) => persist((next) => { const l = next.find((x) => x.id === openList.id); l.items = l.items.filter((x) => x.id !== itemId); });
+      const moveItem = (itemId, dir) => {
+        const l = lists.find((x) => x.id === openList.id); const i = l.items.findIndex((x) => x.id === itemId); const t = i + dir; if (i < 0 || t < 0 || t >= l.items.length) return;
+        persist((next) => { const nl = next.find((x) => x.id === openList.id); const [it] = nl.items.splice(i, 1); nl.items.splice(t, 0, it); });
+      };
+
+      const createList = () => {
+        const name = newName.trim(); if (!name) return;
+        const id = crypto.randomUUID(); persist((next) => next.push({ id, name, items: [] }));
+        setNewName(""); setOpenId(id);
+      };
+
+      if (!openList) {
+        return (
+          <div className="app">
+            <div className="topbar"><h1>Audiolist</h1><span className="count">{lists.length}</span></div>
+            <main className="home">
+              {lists.length === 0 && <p className="emptyLists">Make a list, then record your voice notes into it.</p>}
+              {lists.map((l) => (
+                <button key={l.id} className="listCard" onClick={() => setOpenId(l.id)}>
+                  <span className="name">{l.name}</span><span className="meta">{l.items.length} recording{l.items.length === 1 ? "" : "s"}</span>
+                </button>
+              ))}
+              <div className="newListRow">
+                <input placeholder="List name..." value={newName} onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && createList()} />
+                <button onClick={createList} disabled={!newName.trim()}>Create</button>
+              </div>
+            </main>
+          </div>
+        );
+      }
+
+      return (
+        <div className="app">
+          <div className="topbar">
+            <button className="backBtn" onClick={() => setOpenId(null)}>← Back</button>
+            <h1>{openList.name}</h1>
+            <button className="deleteListBtn" onClick={() => { if(confirm("Delete this list?")) { persist((next) => { const idx = next.findIndex(x => x.id === openList.id); if(idx >= 0) next.splice(idx, 1); }); setOpenId(null); } }}>Delete</button>
+          </div>
+          <main className="listDetail">
+            <div className="recorderBox">
+              {recording ? (
+                <div className="recordingState"><span className="liveDot"></span><span className="timer">{fmt(recTicks)}</span><button onClick={stopRecorder}>Stop</button></div>
+              ) : (
+                <button className="recordBtn" onClick={startRecorder}>🎙️ Record Note</button>
+              )}
+            </div>
+            <div className="itemsList">
+              {openList.items.length === 0 && <p className="empty">No recordings yet.</p>}
+              {openList.items.map((it, idx) => (
+                <div key={it.id} className={`itemCard ${playingId === it.id ? 'playing' : ''}`}>
+                  <button className="playBtn" onClick={() => togglePlay(it.id)}>{playingId === it.id ? "⏸" : "▶"}</button>
+                  <div className="itemBody">
+                    <input className="itemNameInput" value={it.name} onChange={(e) => renameItem(it.id, e.target.value)} />
+                    <div className="waveform">
+                      {peaks(it.id, 20).map((p, i) => <div key={i} style={{height: `${p * 100}%`}} className="bar"></div>)}
+                    </div>
+                  </div>
+                  <div className="itemMeta">
+                    <span className="duration">{fmt(it.duration)}</span>
+                    <div className="itemActions">
+                      <button title="Download" onClick={() => downloadAudio(it.id)}>💾</button>
+                      <button disabled={idx === 0} onClick={() => moveItem(it.id, -1)}>↑</button>
+                      <button disabled={idx === openList.items.length - 1} onClick={() => moveItem(it.id, 1)}>↓</button>
+                      <button className="delBtn" onClick={() => deleteItem(it.id)}>✕</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    const root = tragedies = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
+
