@@ -6,10 +6,10 @@
   <title>Audiolist</title>
   <link rel="stylesheet" href="styles.css" />
   
-  <!-- Veilige en stabiele links via Cloudflare CDN die CORS-fouten voorkomen -->
+  <!-- Dit zijn de exacte, volledige links naar de benodigde softwarepakketten -->
   <script src="https://cloudflare.com" crossorigin="anonymous"></script>
-  <script src="https://cloudflare.com" crossorigin></script>
-  <script src="https://cloudflare.com"></script>
+  <script src="https://cloudflare.com" crossorigin="anonymous"></script>
+  <script src="https://cloudflare.com" crossorigin="anonymous"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -33,6 +33,7 @@
       }
     }
 
+    // [De rest van de app-logica gaat hieronder verder in Deel 2]
     function fmt(sec) {
       sec = Math.max(0, Math.round(sec));
       const m = Math.floor(sec / 60);
@@ -199,11 +200,21 @@
                     <span className="duration">{fmt(it.duration)}</span>
                     <div className="itemActions">
                       <button title="Download" onClick={() => downloadAudio(it.id)}>💾</button>
-                      <button disabled={idx === 0} onClick={() => moveItem(it.id, -1)}>↑
-                      <button disabled={idx === openList.items.length - 1} onClick={() => moveItem(it.id, 1)}>↓
-                      <button className="delBtn" onClick={() => deleteItem(it.id)}>✕
-))}
-                        );
-                        }
-                        const root = ReactDOM.createRoot(document.getElementById("root"));
-                        root.render();
+                      <button disabled={idx === 0} onClick={() => moveItem(it.id, -1)}>↑</button>
+                      <button disabled={idx === openList.items.length - 1} onClick={() => moveItem(it.id, 1)}>↓</button>
+                      <button className="delBtn" onClick={() => deleteItem(it.id)}>✕</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
+</body>
+</html>
