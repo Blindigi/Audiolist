@@ -5,19 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Audiolist</title>
   <link rel="stylesheet" href="styles.css" />
-  <script type="importmap">
-  {
-    "imports": {
-      "react": "https://esm.sh/react@18.3.1",
-      "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-      "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
-      "react/jsx-dev-runtime": "https://esm.sh/react@18.3.1/jsx-dev-runtime"
-    }
-  }
-  </script>
+  
+  <!-- Scripts voor browser-ondersteuning van React en Babel -->
+  <script src="https://unpkg.com" crossorigin></script>
+  <script src="https://unpkg.com" crossorigin></script>
+  <script src="https://unpkg.com"></script>
 </head>
 <body>
   <div id="root"></div>
-  <script type="module" src="app.jsx"></script>
+
+  <!-- We laden hier het losse JavaScript-bestand in -->
+  <script type="text/babel" src="app.js"></script>
 </body>
 </html>
